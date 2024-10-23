@@ -102,6 +102,7 @@ static drax_value __d_typeof(d_vm* vm, int* stat) {
       case DS_FUNCTION: MSR(vm, "function");
       case DS_STRING: MSR(vm, "string");
       case DS_LIST: MSR(vm, "list");
+      case DS_TIME: MSR(vm, "time");
       case DS_TENSOR: MSR(vm, "tensor");
       case DS_FRAME: MSR(vm, "frame");
       case DS_MODULE: MSR(vm, "module");
@@ -1024,6 +1025,251 @@ static drax_value __d_disconnect_server(d_vm* vm, int* stat) {
 }
 
 /**
+ * Time
+*/
+
+static drax_value __d_time_now(d_vm* vm, int* stat) {
+  drax_time* nt = new_dtime(vm);
+  time_t now = time(NULL);
+  
+  nt->timestamp = now;
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(nt);  
+}
+
+static drax_value __d_time_to_frame(d_vm* vm, int* stat) {
+  drax_value v = pop(vm);
+  return_if_is_not_time(v, stat);
+  drax_time* dt = CAST_TIME(v);
+
+  struct tm* time = localtime(&dt->timestamp);
+
+  drax_frame* f = new_dframe(vm, 3);
+  put_value_dframe(f, (char*) "hours", num_to_draxvalue((double) time->tm_hour));
+  put_value_dframe(f, (char*) "minutes", num_to_draxvalue((double) time->tm_min));
+  put_value_dframe(f, (char*) "seconds", num_to_draxvalue((double) time->tm_sec));
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(f);  
+}
+
+static drax_value __d_time_from_frame(d_vm* vm, int* stat) {
+  drax_value v = pop(vm);
+  return_if_is_not_frame(v, stat);
+
+  drax_frame* f = CAST_FRAME(v);
+  drax_time* t = new_dtime(vm);
+  struct tm* time = localtime(&t->timestamp);
+
+  drax_value hours;
+  if(get_value_dframe(f, (char*) "hours", &hours) != -1) {
+    return_if_is_not_number(hours, stat);
+    time->tm_hour = (int) CAST_NUMBER(hours);
+    if(time->tm_hour < 0 || time->tm_hour > 23) {
+      return DS_VAL(new_derror(vm, (char*) "Invalid time: expected hours in the range 0 and 23"));
+    }
+  }
+
+  drax_value minutes;
+  if(get_value_dframe(f, (char*) "minutes", &minutes) != -1) {
+    return_if_is_not_number(minutes, stat);
+    time->tm_min = (int) CAST_NUMBER(minutes);
+    if(time->tm_min >= 60) {
+      return DS_VAL(new_derror(vm, (char*) "Invalid time: minutes cannot be greater than or equal to 60."));
+    }
+  }
+  
+  drax_value seconds;
+  if(get_value_dframe(f, (char*) "seconds", &seconds) != -1) {
+    return_if_is_not_number(seconds, stat);
+    time->tm_sec = (int) CAST_NUMBER(seconds);
+
+    if(time->tm_sec >= 60) {
+      return DS_VAL(new_derror(vm, (char*) "Invalid time: seconds cannot be greater than or equal to 60."));
+    }
+  }
+
+  t->timestamp = mktime(time);
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(t);  
+}
+
+static drax_value __d_time_add(d_vm* vm, int* stat) {
+  drax_value b = pop(vm);
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  return_if_is_not_time(b, stat);
+  drax_time* t1 = CAST_TIME(a);
+  drax_time* t2 = CAST_TIME(b);
+
+  struct tm* ntime = (struct tm*) malloc(sizeof(struct tm));
+
+  struct tm* time1 = localtime(&t1->timestamp);
+  struct tm* time2 = localtime(&t2->timestamp);
+    
+  ntime->tm_sec = time1->tm_sec + time2->tm_sec;
+  if(ntime->tm_sec >= 60) {
+    ntime->tm_min = (time1->tm_sec + time2->tm_sec) / 60;
+    ntime->tm_sec = ntime->tm_sec - (60 * ntime->tm_min);
+  }
+
+  ntime->tm_min += time1->tm_min + time2->tm_min;
+  if(ntime->tm_min >= 60) {
+    ntime->tm_hour = (time1->tm_min + time2->tm_min) / 60;
+    ntime->tm_min = ntime->tm_min - (60 * ntime->tm_min);
+  }
+  ntime->tm_hour += time1->tm_hour + time2->tm_hour;
+
+  drax_time* nt = new_dtime(vm);
+  nt->timestamp = mktime(ntime);
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(nt);  
+}
+
+static drax_value __d_time_new(d_vm* vm, int* stat) {
+  drax_value c = pop(vm);
+  drax_value b = pop(vm);
+  drax_value a = pop(vm);
+  return_if_is_not_number(c, stat);
+  return_if_is_not_number(b, stat);
+  return_if_is_not_number(a, stat);
+
+  int hours = (int) CAST_NUMBER(a);
+  int minutes = (int) CAST_NUMBER(b);
+  if(minutes >= 60) {
+    return DS_VAL(new_derror(vm, (char*) "Invalid time: minutes cannot be greater than or equal to 60"));
+  }
+
+  int seconds = (int) CAST_NUMBER(c);
+  if(seconds >= 60) {
+    return DS_VAL(new_derror(vm, (char*) "Invalid time: seconds cannot be greater than or equal to 60"));
+  }
+  
+  if(hours < 0 || hours > 23) {
+    return DS_VAL(new_derror(vm, (char*) "Invalid time: expected hours in the range 0 and 23"));
+  }
+
+  drax_time* nt = new_dtime(vm);
+  struct tm* time = localtime(&nt->timestamp);
+  time->tm_hour = hours;
+  time->tm_min = minutes;
+  time->tm_sec = seconds;
+
+  nt->timestamp = mktime(time);
+  
+  DX_SUCESS_FN(stat);
+  return DS_VAL(nt);  
+}
+
+static drax_value __d_time_from_seconds(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_number(a, stat);
+  int sencods = (int) CAST_NUMBER(a);
+
+  drax_time* t = new_dtime(vm);
+  struct tm* time = (struct tm*) malloc(sizeof(struct tm));
+
+  time->tm_sec = sencods;
+  if(time->tm_sec >= 60) {
+    time->tm_min = time->tm_sec / 60;
+    time->tm_sec = time->tm_sec - (time->tm_min * 60);
+  }
+
+  if(time->tm_min >= 60) {
+    time->tm_hour = time->tm_min / 60;
+    time->tm_min = time->tm_min - (time->tm_hour * 60);
+  }
+
+  t->timestamp = mktime(time);
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(t);  
+}
+
+static drax_value __d_time_to_string(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  drax_time* t = CAST_TIME(a);
+  struct tm* time = localtime(&t->timestamp);
+
+  char* res = (char*) malloc(sizeof(char) * 9);
+  snprintf(res, sizeof(res) + 1, "%02d:%02d:%02d", time->tm_hour, time->tm_min, time->tm_sec);
+
+  drax_string* s = new_dstring(vm, (char*) res, strlen(res));
+  s->chars[strlen(s->chars) + 1] = '\0';
+  DX_SUCESS_FN(stat);
+  return DS_VAL(s);  
+}
+
+static drax_value __d_time_from_string(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_string(a, stat);
+  drax_string* s = CAST_STRING(a);
+
+  drax_time* t = new_dtime(vm);
+  struct tm* time = localtime(&t->timestamp);
+
+  int hour, min, sec;
+  char _e;
+  if(sscanf(s->chars, "%d:%d:%d%c", &hour, &min, &sec, &_e) != 3) {
+    DX_ERROR_FN(stat);
+    return DS_VAL(new_derror(vm, (char*) "Invalid format: the expected format is hh:mm:ss"));
+  }
+
+  t->timestamp = mktime(time);
+
+  DX_SUCESS_FN(stat);
+  return DS_VAL(t);  
+}
+
+static drax_value __d_time_get_hours(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  drax_time* t = CAST_TIME(a);
+  struct tm* time = localtime(&t->timestamp);
+
+  DX_SUCESS_FN(stat);
+  return num_to_draxvalue((double) time->tm_hour);  
+}
+
+static drax_value __d_time_get_minutes(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  drax_time* t = CAST_TIME(a);
+  struct tm* time = localtime(&t->timestamp);
+
+  DX_SUCESS_FN(stat);
+  return num_to_draxvalue((double) time->tm_min);  
+}
+
+static drax_value __d_time_get_seconds(d_vm* vm, int* stat) {
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  drax_time* t = CAST_TIME(a);
+  struct tm* time = localtime(&t->timestamp);
+
+  DX_SUCESS_FN(stat);
+  return num_to_draxvalue((double) time->tm_sec);  
+}
+
+static drax_value __d_time_diff(d_vm* vm, int* stat) {
+  drax_value b = pop(vm);
+  drax_value a = pop(vm);
+  return_if_is_not_time(a, stat);
+  return_if_is_not_time(b, stat);
+
+  drax_time* t1 = CAST_TIME(a);
+  drax_time* t2 = CAST_TIME(b);
+  double diff = difftime(t1->timestamp, t2->timestamp);
+
+  DX_SUCESS_FN(stat);
+  return num_to_draxvalue(diff);  
+}
+
+/**
  * Entry point for native modules
  */
 
@@ -1043,6 +1289,28 @@ void create_native_modules(d_vm* vm) {
 
   put_fun_on_module(mos, os_helper, sizeof(os_helper) / sizeof(drax_native_module_helper)); 
   put_mod_table(vm->envs->modules, DS_VAL(mos));
+
+    /**
+   * Time module
+  */
+  drax_native_module* mtime = new_native_module(vm, "Time", 12);
+  const drax_native_module_helper time_helper[] = {
+    {0, "now", __d_time_now },
+    {1, "to_frame", __d_time_to_frame },
+    {1, "from_frame", __d_time_from_frame },
+    {2, "add", __d_time_add },
+    {3, "new", __d_time_new },
+    {1, "from_seconds", __d_time_from_seconds },
+    {1, "to_string", __d_time_to_string },
+    {1, "from_string", __d_time_from_string },
+    {1, "get_hours", __d_time_get_hours },
+    {1, "get_minutes", __d_time_get_minutes },
+    {1, "get_seconds", __d_time_get_seconds },
+    {2, "diff", __d_time_diff },
+  };
+
+  put_fun_on_module(mtime, time_helper, sizeof(time_helper) / sizeof(drax_native_module_helper)); 
+  put_mod_table(vm->envs->modules, DS_VAL(mtime));
 
   /**
    * Core module

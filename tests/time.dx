@@ -1,0 +1,114 @@
+a = Time.from_frame({'hours': 3, 'minutes': 10, 'seconds': 50})
+b = Time.from_frame({'hours': 5, 'minutes': 55, 'seconds': 10})
+result = Time.add(a, b)
+expected = Time.new(9, 6, 0)
+assert(result == expected, "time error: expected result Time<09:06:00>")
+
+a = Time.new(1, 5, 10)
+b = Time.new(1, 55, 10)
+result = Time.add(a, b)
+expected = Time.new(3, 0, 20)
+assert(result == expected, "time error: expected result Time<03:00:20>")
+
+t = Time.new(10, 20, 30)
+result = Time.to_frame(t)
+expected = {'hours': 10, 'minutes': 20, 'seconds': 30}
+assert(result == expected, "time error: unspected result.")
+
+t = Time.new(9, 59, 59)
+f = Time.to_frame(t)
+result = Time.from_frame(f)
+assert(result == t, "time error: expected result as Time<09:59:59>")
+
+result = Time.from_seconds(10000)
+expected = Time.new(2, 46, 40)
+assert(result == expected, "time error: expected result as Time<02:46:40>")
+
+result = Time.from_seconds(1256)
+expected = Time.new(0, 20, 56)
+assert(result == expected, "time error: expected result as Time<00:2:56>")
+
+result = Time.from_seconds(5326)
+expected = Time.new(1, 28, 46)
+assert(result == expected, "time error: expected result as Time<1:28:46>")
+
+result = Time.to_string(Time.new(22, 10, 55))
+expected = "22:10:55"
+assert(result == expected, "time error: expected 22:10:55 as result")
+
+result = Time.to_string(Time.new(00, 18, 5))
+expected = "00:18:05"
+assert(result == expected, "time error: expected 00:18:05 as result")
+
+result = Time.to_string(Time.new(11, 59, 59))
+expected = "11:59:59"
+assert(result == expected, "time error: expected 11:59:59 as result")
+
+result = Time.from_string("10:10:22")
+expected = Time.new(10, 10, 22)
+assert(result == expected, "time error: expected Time<10:10:22> as result")
+
+result = Time.from_string("1:1:2")
+expected = Time.new(1, 1, 2)
+assert(result == expected, "time error: expected Time<01:01:02> as result")
+
+result = Time.from_string("23:58:59")
+expected = Time.new(23, 58, 59)
+assert(result == expected, "time error: expected Time<23:58:59> as result")
+
+result = Time.from_string("23:00:00")
+expected = Time.new(23, 00, 00)
+assert(result == expected, "time error: expected Time<23:00:00> as result")
+
+result = Time.from_string("21:45:32")
+expected = Time.new(21, 45, 32)
+assert(result == expected, "time error: expected Time<21:45:32> as result")
+
+result = Time.from_string("0:25:0")
+expected = Time.new(0, 25, 0)
+assert(result == expected, "time error: expected Time<00:25:00> as result")
+
+result = Time.from_string("0:0:0")
+expected = Time.new(0, 0, 0)
+assert(result == expected, "time error: expected Time<00:00:00> as result")
+
+result = Time.from_string("05:03:22")
+expected = Time.new(5, 3, 22)
+assert(result == expected, "time error: expected Time<05:03:22> as result")
+
+result = Time.from_string("08:50:01")
+expected = Time.new(8, 50, 1)
+assert(result == expected, "time error: expected Time<08:50:01> as result")
+
+t = Time.new(11, 25, 36)
+result = Time.get_seconds(t)
+expected = 36
+assert(result == expected, "time error: expected 36 as result")
+
+result = Time.get_minutes(t)
+expected = 25
+assert(result == expected, "time error: expected 25 as result")
+
+result = Time.get_hours(t)
+expected = 11
+assert(result == expected, "time error: expected 11 as result")
+
+t1 = Time.new(10, 20, 30)
+t2 = Time.new(10, 20, 10)
+result = Time.diff(t1, t2)
+expected = 20
+assert(result == expected, "time error: expected 20 seconds as result")
+
+t1 = Time.new(10, 20, 30)
+t2 = Time.new(10, 19, 30)
+result = Time.diff(t1, t2)
+expected = 60
+assert(result == expected, "time error: expected 60 seconds as result")
+
+t1 = Time.new(10, 20, 30)
+t2 = Time.new(9, 20, 30)
+result = Time.diff(t1, t2)
+expected = 3600
+assert(result == expected, "time error: expected 60 seconds as result")
+
+print("Time done")
